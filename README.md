@@ -53,7 +53,7 @@ This project provides a Streamlit web application for validating API specs and i
 
    Start the Streamlit app:
    ```sh
-   streamlit run app.py
+   streamlit run main.py
    ```
 
 7. Open your web browser and navigate to [http://localhost:8501](http://localhost:8501) to access the application.
