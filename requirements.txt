@@ -1,0 +1,7 @@
+
+openai
+streamlit
+streamlit-chat
+pyyaml
+jsonschema
+load_dotenv
