@@ -1,12 +1,12 @@
 
 # API Spec Validator and AI Guidance Chat
 
-This project provides a Streamlit web application for validating API specs and interacting with an AI bot for API guidance. The application uses OpenAI's GPT-3.5-turbo model to generate API documentation and provide guidance.
+This project provides a Streamlit web application for validating API specs and interacting with an AI-powered bot for API guidance. Powered by the OpenAI model, it ensures API spec compliance and offers strategic, design, and security insights aligned with recommended best practices.
 
 ## Features
 
-- **API Spec Validator**: Upload and validate your API specifications (JSON or YAML) against the OpenAPI standard.
-- **AI Guidance Chat**: Interact with an AI assistant for API-related guidance and documentation generation.
+- **API Spec Validator**: Upload and validate your API specifications (JSON or YAML) to ensure compliance with the OpenAPI standard and follow recommended best practices.
+- **AI Guidance Chat**: Engage with an AI-powered bot for guidance on API Strategy, Design, and Security, aligned with recommended best practices.
 
 ## Prerequisites
 
