@@ -10,7 +10,7 @@ This project provides a Streamlit web application for validating API specs and i
 
 ## Prerequisites
 
-- Python 3.7 or higher
+- Python 3.12 or higher
 - An OpenAI API key
 
 ## Installation

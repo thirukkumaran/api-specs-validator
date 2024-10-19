@@ -1,7 +1,13 @@
-
 openai
 streamlit
 streamlit-chat
 pyyaml
 jsonschema
 load_dotenv
+requests==2.27.1
+langchain
+faiss-cpu
+langchain-community
+sentence-transformers
+certifi
+python-dotenv
