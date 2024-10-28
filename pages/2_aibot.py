@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import requests
 import pickle
 import os
+import certifi  # Proper SSL handling with certifi
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,36 +18,57 @@ load_dotenv()
 API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://litellm.govtext.gov.sg"
 
-os.environ['CURL_CA_BUNDLE'] = ''  # Ensure SSL handling if needed
+# Ensure Python uses certifi's CA bundle for SSL handling
+os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+
+# Verify API key exists
+if not API_KEY:
+    st.error("API Key not found. Please add it to the .env file.")
+    st.stop()
 
 class CustomEmbeddings(Embeddings):
     """Custom embedding class to fetch embeddings from your model."""
     def embed_documents(self, texts):
+        """Embed multiple documents."""
         input_json = {"model": "text-embedding-3-small-prd-gcc2-lb", "input": texts}
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {API_KEY}",
             "User-Agent": "Mozilla/5.0"
         }
-        response = requests.post(f"{BASE_URL}/embeddings", json=input_json, headers=headers)
-        if response.status_code == 200:
-            return [item["embedding"] for item in response.json()["data"]]
-        else:
-            st.error(f"Embedding error: {response.text}")
+        try:
+            response = requests.post(
+                f"{BASE_URL}/embeddings",
+                json=input_json,
+                headers=headers,
+                verify=False  # Use certifi's CA bundle for SSL verification
+            )
+            response.raise_for_status()
+            return [item["embedding"] for item in response.json().get("data", [])]
+        except requests.RequestException as e:
+            st.error(f"Embedding error: {e}")
             return []
 
     def embed_query(self, text):
         """Embed a single query."""
-        return self.embed_documents([text])[0]
+        embeddings = self.embed_documents([text])
+        return embeddings[0] if embeddings else []
 
 @st.cache_resource(show_spinner=True)
 def init_faiss():
+    """Initialize FAISS index and load from cache if available."""
     index_path = "faiss_index.pkl"
     content_folder = "content"
+
+    if not os.listdir(content_folder):
+        st.error("Content folder is empty. Please add documents to 'content/' directory.")
+        st.stop()
+
     files_modified = max(
         os.path.getmtime(os.path.join(content_folder, f))
         for f in os.listdir(content_folder)
     )
+
     if os.path.exists(index_path) and os.path.getmtime(index_path) >= files_modified:
         with open(index_path, "rb") as f:
             return pickle.load(f)
@@ -64,11 +86,11 @@ def init_faiss():
     return faiss_index
 
 def query_custom_model(prompt, context):
+    """Query the custom model with user input and context."""
     messages = [
         {"role": "system", "content": (
             "You are an expert assistant that answers questions strictly using the provided context. "
-            "Try to extract relevant information from the context to provide the best possible answer. "
-            "If the answer is not directly in the context, make an educated guess based on it."
+            "Extract relevant information and provide the best answer. Make educated guesses if needed."
         )},
         {"role": "system", "content": f"Context:\n{context}"},
         {"role": "user", "content": prompt},
@@ -78,16 +100,21 @@ def query_custom_model(prompt, context):
         "Authorization": f"Bearer {API_KEY}",
         "User-Agent": "Mozilla/5.0"
     }
-    response = requests.post(
-        f"{BASE_URL}/chat/completions", json={"model": "gpt-4o-prd-gcc2-lb", "messages": messages}, headers=headers
-    )
-    if response.status_code == 200:
+    try:
+        response = requests.post(
+            f"{BASE_URL}/chat/completions",
+            json={"model": "gpt-4o-prd-gcc2-lb", "messages": messages},
+            headers=headers,
+            verify=False  # Use certifi's CA bundle
+        )
+        response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"].strip()
-    else:
-        st.error(f"Chat error: {response.text}")
+    except requests.RequestException as e:
+        st.error(f"Chat request failed: {e}")
         return "I'm sorry, I couldn't process your request."
 
 def interact_with_bot(user_input):
+    """Handle chat interaction using FAISS and custom model."""
     if "faiss_index" not in st.session_state:
         st.session_state.faiss_index = init_faiss()
 
@@ -97,13 +124,15 @@ def interact_with_bot(user_input):
         return "No relevant context found."
     return query_custom_model(user_input, context)
 
+# Initialize session state for messages
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 st.title("API Guidance Chat")
-st.write("Chat with AIbot for guidance on API strategy, design, security, and more!")
+st.write("Chat for guidance on API strategy, design, security, and more!")
 
 def get_user_input():
+    """Capture user input via Streamlit form."""
     with st.form(key="user_input_form"):
         user_input = st.text_input("You:")
         submit_button = st.form_submit_button(label="Send")
@@ -115,6 +144,7 @@ if user_input:
     ai_response = interact_with_bot(user_input)
     st.session_state.messages.insert(0, {"user": user_input, "bot": ai_response})
 
+# Display chat history
 for index, msg in enumerate(st.session_state.messages):
     st_message(msg["user"], is_user=True, key=f"user_{index}")
     st_message(msg["bot"], is_user=False, key=f"bot_{index}")

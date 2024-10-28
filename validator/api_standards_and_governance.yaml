@@ -1,0 +1,91 @@
+name: "API Standard and Governance"
+sections:
+#  - id: "3.1.1"
+#    name: "Plan your APIs"
+#    rules:
+#      - rule: "Identify the users of your APIs and understand their use cases. Prepare API specifications and run this through with users for feedback."
+#        humanReview: true
+#      - rule: "Ensure that APIs are not duplicated, and if it is similar to another API, do consider to combine with or fold the new resource(s) into the existing API."
+#        humanReview: false
+#      - rule: "Do consider the data classification of the resource(s) and that the access to resource is authenticated appropriately and has the correct authorization checks in place."
+#        humanReview: true
+#  - id: "3.1.2"
+#    name: "Clear and Concise Use of Wording Paths, Headers, Queries"
+#    rules:
+#      - rule: "The use of clear and concise terms for defining object relating to API (eg. use of path - personal-address), or action-object (eg as get-personal-address). Ambiguous use of English (eg. use of header - do-not-hardcode: false), and double-negatives should be avoided."
+#        humanReview: false
+#      - rule: "Paths should reference nouns and universal terms rather than department names or policy names which could change in the future."
+#        humanReview: false
+#  - id: "3.1.3"
+#    name: "API Specification, Standardized Naming Conventions"
+#    rules:
+#      - rule: "The API should be designed and documented with openAPI specifications as much as possible."
+#        humanReview: true
+#      - rule: "Naming and Caps conventions should be standardized for readability, such as:
+#[1] URL using lower-cased kebab-case conventions
+#[2] JSON key names follow a standardized convention such as lowercase underscore_linked
+#[3] header names using lower kebab-case (in line with HTTP/2 standards) starting with organiation header (eg. x-cpf-overwrite-header)
+#[4] OAuth scopes using organization:object:action names, which are lowercase, underscored_linked and separated by colons, such as cpf:header_name:read."
+#        humanReview: false
+#  - id: "3.1.4"
+#    name: "REST API and JSON"
+#    rules:
+#      - rule: "The API should be designed to be as a modern interface in REST API, adopting JSON standards in its request and response payload, as much as possible."
+#        humanReview: false
+#      - rule: "Where complex data structures be defined for the API resource, do consider using graphQL."
+#        humanReview: true
+#      - rule: "XML APIs should generally be replaced with simpler REST API definitions."
+#        humanReview: true
+#  - id: "3.1.5"
+#    name: "Date and Time Standards"
+#    rules:
+#      - rule: "Date and Time specifications should follow the ISO8601 standard, which is defaulted to local Singapore (UTC+8) time, unless otherwise stated."
+#        humanReview: false
+#  - id: "3.1.6"
+#    name: "API Documentation"
+#    rules:
+#      - rule: "APIs shall be documented in a standardised format (such as openAPI specifications)."
+#        humanReview: true
+#      - rule: "The documentation should be housed in a central location such as Gitlab, Documentation portal or on the API Marketplace."
+#        humanReview: true
+#  - id: "3.1.7"
+#    name: "API Request and Response"
+#    rules:
+#      - rule: "APIs must only be requested and responded to only with the content-type(s) stated in the API documentation. Where the response refers to a resource which could be referenced by an API, do consider to respond with the URL of the resource URL."
+#        humanReview: true
+#      - rule: "API response should also be precise and concise where possible and not provide too much information, and also support filtering."
+#        humanReview: false
+#  - id: "3.1.8"
+#    name: "When Not to use APIs"
+#    rules:
+#      - rule: "API use should not be employed in the following scenarios(s):
+#[1] large file transfer (>10 Megabytes)"
+#        humanReview: true
+#  - id: "3.2.1"
+#    name: "Path Segments"
+#    rules:
+#      - rule: "Use kebab-case for path segments and words should be in lower case and in English where possible. The Path structure should be clearly defined in a standardized format."
+#        humanReview: false
+#  - id: "3.2.2"
+#    name: "Query Parameters"
+#    rules:
+#      - rule: "Query parameters should be lowerCamelCased. This is to allow readability and distinction from the path."
+#        humanReview: false
+#      - rule: "Query parameters should define filter or fine-tune API resources and NOT define an action."
+#        humanReview: false
+#  - id: "3.2.3"
+#    name: "Sensitive Information"
+#    rules:
+#      - rule: "Avoid the use of directly identifiable or sensitive information such as NRIC or other IDs in the URI (ie. path and query parameters). Paths and query parameters may be cached or logged in systems or network devices outside of control of the client and publisher server. Instead, use a represented ID (eg. UUIDv4 format) and only have sensitive ID information in the payload. Do consider encryption if the information is of high sensitivity."
+#        humanReview: false
+#  - id: "3.2.4"
+#    name: "Payload Encoding"
+#    rules:
+#      - rule: "The content body should be encoded using UTF-8 for standardization."
+#        humanReview: false
+  - id: "3.2.5"
+    name: "Methods Definition"
+    rules:
+      - rule: "Methods should correspond to the CRUD definitions where possible such that, POST is to create and replace resource, PATCH is to update resource, DELETE is to delete resource and GET is to get information about the resource."
+        humanReview: false
+

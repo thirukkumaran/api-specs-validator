@@ -4,5 +4,7 @@ myenv
 __pycache__/
 .idea
 .git
-content
-faiss*.*
+*.pkl
+*.log
+*.pem
+*.db

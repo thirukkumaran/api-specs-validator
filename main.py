@@ -1,44 +1,20 @@
-import streamlit as st
 import json
-import yaml
-from jsonschema import validate, ValidationError
 import openai
-from dotenv import load_dotenv
 import os
+import streamlit as st
+import yaml
+
+from dotenv import load_dotenv
+from typing import Any, Callable
+from validator.api_standards_and_governance import validate_api_spec as validate_api_standards_and_governance
+from validator.models import RequestModel, Report, ResponseModel
+from validator.openapi_standard import validate_api_spec as validate_openapi_standard
 
 # Load environment variables and set up OpenAI API key
 load_dotenv('.env')
-openai.api_key = os.getenv('OPENAI_API_KEY')
+# openai.api_key = os.getenv('OPENAI_API_KEY')
 
-# Load OpenAPI standard schema from external JSON file
-with open("openapi_standard.json", "r") as f:
-    openapi_standard = json.load(f)
-
-# Function to validate API specs and return simplified error messages
-def validate_api_spec(api_spec):
-    try:
-        validate(instance=api_spec, schema=openapi_standard)
-        return "API Spec is valid!", True, []
-    except ValidationError as e:
-        # Extract relevant error information
-        error_path = " -> ".join([str(x) for x in list(e.path)]) if e.path else "Unknown path"
-        error_message = f"Error at {error_path}: {e.message}"
-        return "API Spec is invalid.", False, [error_message]
-
-# Function to generate documentation using ChatCompletion
-def generate_documentation(api_spec):
-    # Using a conversation-based prompt for ChatCompletion
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant skilled in creating API documentation."},
-        {"role": "user", "content": f"Generate a standardized API documentation for the following spec:\n{json.dumps(api_spec, indent=2)}"}
-    ]
-
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # Use the appropriate model name based on your API subscription
-        messages=messages,
-        verify=False  # Disable SSL verification
-    )
-    return response.choices[0].message['content'].strip()
+os.environ['CURL_CA_BUNDLE'] = ''  # Ensure SSL handling if needed
 
 # Function to handle AIbot interactions using ChatCompletion
 def interact_with_bot(user_input):
@@ -58,9 +34,64 @@ def interact_with_bot(user_input):
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["API Spec Validator", "API Guidance Chat"])
 
+def renderReportInMarkdown(report: Report):
+    st.markdown(
+        """
+        <style>
+        .normal {
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 10px;
+            background-color: #f4f4f4;
+            border: 1px solid #ddd;
+        }
+        .highlight {
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 10px;
+            background-color: #e1f5fe;
+            border: 1px solid #ddd;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(header(report.name, 1))
+    for section in report.sections:
+        st.markdown(header(section.id, 3) + ' ' + section.name)
+        for rule in section.rules:
+            if rule.humanReview:
+                card(rule.rule, rule.recommendation, "normal")
+            else:
+                card(rule.rule, rule.recommendation, "highlight")
+
+def header(s: str, n: int) -> str:
+    return '#'*n + ' ' + s
+
+def card(rule: str, recommendation: str, style: str) -> None:
+    st.markdown(
+        f'''
+        <div class="{style}">
+            <h4>{rule}</h4>
+            {recommendation}
+        </div>
+        ''',
+        unsafe_allow_html=True
+    )
+class Option:
+    def __init__(self, name, validator: Callable[[Any], ResponseModel]):
+        self.name = name
+        self.validator = validator
+        self.checked = False
+
 # Display the selected page based on the sidebar menu option
 if page == "API Spec Validator":
     st.title("API Spec Validator")
+
+    options: list[Option] = []
+    options.append(Option("OpenAPI Standard", validate_openapi_standard))
+    options.append(Option("API Standard and Governance", validate_api_standards_and_governance))
 
     # File upload section
     uploaded_file = st.file_uploader("Upload your API Spec (JSON or YAML)", type=["json", "yaml"])
@@ -68,33 +99,28 @@ if page == "API Spec Validator":
         # Load the file and perform validation
         try:
             if uploaded_file.name.endswith(".json"):
-                api_spec = json.load(uploaded_file)
+                req = RequestModel("json", json.load(uploaded_file))
             else:
-                api_spec = yaml.safe_load(uploaded_file)
+                req = RequestModel("yaml", yaml.safe_load(uploaded_file))
 
-            # Display validation results with user-friendly error messages
-            st.subheader("Validation Results")
-            validation_result, is_valid, error_list = validate_api_spec(api_spec)
-            st.write(validation_result)
+            st.subheader("Generate report for the following:")
 
-            # Display errors if validation fails
-            if not is_valid:
-                st.error("The following errors were found in the API specification:")
-                for error in error_list:
-                    st.write(f"- {error}")
+            tabNames: list[str] = []
+            for i in range(len(options)):
+                options[i].checked = st.checkbox(options[i].name, True)
+                if options[i].checked:
+                    tabNames.append(options[i].name)
 
-            # If valid, generate and display documentation
-            if is_valid:
-                st.subheader("Generated Documentation")
-                documentation = generate_documentation(api_spec)
-                st.text_area("Documentation", documentation, height=300)
-
-                # Option to download the documentation
-                st.download_button(
-                    label="Download Documentation",
-                    data=documentation,
-                    file_name="api_documentation.txt"
-                )
+            if 0 < len(tabNames):
+                t = st.tabs(tabNames)
+                ci = 0
+                for i in range(len(options)):
+                    if options[i].checked:
+                        with t[ci]:
+                            with st.spinner('Generating report...'):
+                                response = options[ci].validator(req)
+                            renderReportInMarkdown(response.report)
+                        ci += 1
 
         except Exception as e:
             st.error(f"Error processing the file: {str(e)}")
