@@ -28,3 +28,6 @@ sentence-transformers==2.2.2
 
 # SSL certificate handling
 certifi==2023.7.22
+
+# Force binary installation for Pillow to avoid build issues
+pillow --only-binary=:all:==9.5.0
