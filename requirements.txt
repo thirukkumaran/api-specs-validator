@@ -1,33 +1,30 @@
-# OpenAI API client library
+# Core dependencies
+streamlit==1.29.0  # Latest supported Streamlit version
+
+# Chat interface and API interactions
+streamlit-chat==0.1.1
 openai==0.28.0
 
-# Streamlit and Streamlit Chat for the web interface
-streamlit==1.26.0
-streamlit-chat==0.1.1
-
-# YAML and JSON validation libraries
-pyyaml==6.0.1
-jsonschema==4.19.0
-
-# Environment variable management
+# Environment management
 python-dotenv==1.0.0
-load_dotenv==0.1.0  # This is part of python-dotenv but can be safely included
 
-# HTTP requests library for stability
-requests==2.27.1 
+# JSON and YAML validation
+jsonschema==4.19.0
+pyyaml==6.0.1
 
-# LangChain and Community Tools
+# Requests library for HTTP handling
+requests==2.31.0
+
+# AI and NLP tools
 langchain==0.0.305
 langchain-community==0.0.12
-
-# FAISS for vector similarity search
-faiss-cpu==1.9.0
-
-# Sentence Transformers for embeddings
 sentence-transformers==2.2.2
 
-# SSL certificate handling
+# FAISS for vector search
+faiss-cpu==1.9.0
+
+# SSL certificate management
 certifi==2023.7.22
 
-# Force binary installation for Pillow to avoid build issues
+# Image handling with Pillow (binary install to avoid build errors)
 pillow --only-binary=:all:==9.5.0
