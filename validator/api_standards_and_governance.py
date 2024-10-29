@@ -35,8 +35,7 @@ def validate_api_spec(req:RequestModel) -> ResponseModel:
 
     print("1")
     llm = ChatOpenAI(
-        # api_key=os.getenv("API_KEY"),
-        api_key="sk-vx_6rphVLikmvPDp4J60qw",
+        api_key=os.getenv("API_KEY"),
         openai_api_base="https://litellm.govtext.gov.sg",
         model="gpt-4o-prd-gcc2-lb",
         temperature=0.1,
