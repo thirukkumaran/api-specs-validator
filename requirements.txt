@@ -13,7 +13,7 @@ jsonschema==4.19.0
 pyyaml==6.0.1
 
 # Requests library for HTTP handling
-requests==2.31.0
+requests==2.27.1
 
 # AI and NLP tools
 langchain==0.0.305

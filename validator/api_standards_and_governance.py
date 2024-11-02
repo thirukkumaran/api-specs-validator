@@ -1,9 +1,11 @@
+import asyncio
 import os
 import yaml
 
 from dotenv import load_dotenv
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 
 from .models import RequestModel, ReportSectionRule, ReportSection, Report, ResponseModel
 
@@ -27,22 +29,14 @@ class ASG:
         self.name = name
         self.sections = sections
 
+
+
 def validate_api_spec(req:RequestModel) -> ResponseModel:
     with open('./validator/api_standards_and_governance.yaml', 'r') as f:
-        # data = yaml.load(f, Loader=yaml.SafeLoader)
         data = yaml.safe_load(f)
         asg = ASG(**data)
 
-    print("1")
-    llm = ChatOpenAI(
-        api_key=os.getenv("API_KEY"),
-        openai_api_base="https://litellm.govtext.gov.sg",
-        model="gpt-4o-prd-gcc2-lb",
-        temperature=0.1,
-        default_headers={"user-agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/81.0"},
-    )
-    print("2")
-
+    # Define the prompt
     prompt_template: str = '''
     Given the following OpenAPI specification:
 
@@ -62,30 +56,62 @@ def validate_api_spec(req:RequestModel) -> ResponseModel:
 
     prompt = PromptTemplate.from_template(template=prompt_template)
 
+    # Define the large language model
+    llm = ChatOpenAI(
+        api_key=os.getenv("API_KEY"),
+        openai_api_base="https://litellm.govtext.gov.sg",
+        model="gpt-4o-prd-gcc2-lb",
+        temperature=0.1,
+        default_headers={"user-agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/81.0"},
+    )
+
+    # Define the output parser
+    output_parser = StrOutputParser()
+
+    # Define the chain
+    chain = prompt | llm | output_parser
+
+    async def process_single_query(query: dict) -> str:
+        if query['human_review']:
+            return "This guideline requires human review and cannot be validated by software."
+        else:
+            print(f"start {query['standard_id']}")
+            result = await chain.ainvoke(query)
+            print(f"end {query['standard_id']}")
+            return result
+
+    async def process_multiple_queries(queries: list[dict]) -> list[str]:
+        tasks = [process_single_query(query) for query in queries]
+        results = await asyncio.gather(*tasks)
+        return results
+
+    queries = []
     reportSections: list[ReportSection] = []
     for section in asg.sections:
         reportSectionRules: list[ReportSectionRule] = []
         for rule in section['rules']:
-            if rule['humanReview']:
-                reportSectionRules.append(ReportSectionRule(
-                    rule=rule['rule'],
-                    humanReview=rule['humanReview'],
-                    recommendation="This guideline requires human review and cannot be validated by software."
-                ))
-            else:
-                # content += f"Evaluate via LLM.\n"
-                prompt_formatted: str = prompt.format(
-                    api_spec=req.api_spec,
-                    standard_name=section['name'],
-                    standard_rule=rule['rule'],
-                )
+            queries.append({
+                'api_spec': req.api_spec,
+                'standard_id': section['id'],
+                'standard_name': section['name'],
+                'standard_rule': rule['rule'],
+                'human_review': rule['humanReview']
+            })
 
-                res = llm.invoke(input=prompt_formatted)
-                reportSectionRules.append(ReportSectionRule(
-                    rule=rule['rule'],
-                    humanReview=rule['humanReview'],
-                    recommendation=res.content
-                ))
+            reportSectionRules.append(ReportSectionRule(
+                rule=rule['rule'],
+                humanReview=rule['humanReview'],
+                recommendation=""
+            ))
+
         reportSections.append(ReportSection(section['id'], section['name'], reportSectionRules))
+
+    results = asyncio.run(process_multiple_queries(queries))
+
+    i = 0
+    for s in reportSections:
+        for r in s.rules:
+            r.recommendation = results[i]
+            i += 1
 
     return ResponseModel(Report(asg.name, reportSections), [])
