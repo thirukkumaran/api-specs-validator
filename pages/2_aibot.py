@@ -52,34 +52,55 @@ def check_password():
 # Ensure password protection is active
 if not check_password():
     st.stop()  # Do not continue if check_password is not True.
-
+    
 class CustomEmbeddings(Embeddings):
     """Custom embedding class to fetch embeddings from your model."""
+    
     def embed_documents(self, texts):
         """Embed multiple documents."""
-        input_json = {"model": "text-embedding-3-small-prd-gcc2-lb", "input": texts}
+        input_json = {
+            "model": "text-embedding-3-small-prd-gcc2-lb",
+            "input": texts  # Verify that this format is correct according to API documentation
+        }
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {API_KEY}",
             "User-Agent": "Mozilla/5.0"
         }
+        
         try:
             response = requests.post(
                 f"{BASE_URL}/embeddings",
                 json=input_json,
                 headers=headers,
-                verify=False  # Disable SSL verification for testing
+                verify=False  # Adjust SSL handling as needed
             )
-            response.raise_for_status()
-            return [item["embedding"] for item in response.json().get("data", [])]
+            response.raise_for_status()  # Raises an error for HTTP status codes 400 or above
+
+            # Process and validate response data
+            embedding_data = response.json().get("data", [])
+            if not embedding_data:
+                st.error("No embedding data returned from the server.")
+                return []  # Return an empty list to handle gracefully
+            
+            # Return the embeddings list
+            return [item["embedding"] for item in embedding_data]
+        
         except requests.RequestException as e:
             st.error(f"Embedding error: {e}")
+            # Log response text for debugging if available
+            st.write("Response content:", getattr(e.response, "text", "No response content"))
             return []
 
     def embed_query(self, text):
         """Embed a single query."""
         embeddings = self.embed_documents([text])
-        return embeddings[0] if embeddings else []
+        if embeddings:
+            return embeddings[0]  # Safely access the first embedding if available
+        else:
+            st.error("Failed to retrieve embeddings for query.")
+            return None  # Return None if no embeddings are available
+
 
 def init_faiss():
     """Initialize FAISS index and load from file cache if available."""
