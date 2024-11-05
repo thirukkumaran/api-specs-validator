@@ -29,7 +29,6 @@ if not API_KEY:
 
 def check_password():
     """Returns `True` if the user had the correct password."""
-
     def password_entered():
         """Checks whether a password entered by the user is correct."""
         if hmac.compare_digest(st.session_state["password"], st.secrets["password"]):
@@ -50,7 +49,7 @@ def check_password():
         st.error("😕 Password incorrect")
     return False
 
-
+# Ensure password protection is active
 if not check_password():
     st.stop()  # Do not continue if check_password is not True.
 
@@ -69,7 +68,7 @@ class CustomEmbeddings(Embeddings):
                 f"{BASE_URL}/embeddings",
                 json=input_json,
                 headers=headers,
-                verify=False  # Use certifi's CA bundle for SSL verification
+                verify=False  # Disable SSL verification for testing
             )
             response.raise_for_status()
             return [item["embedding"] for item in response.json().get("data", [])]
@@ -82,32 +81,35 @@ class CustomEmbeddings(Embeddings):
         embeddings = self.embed_documents([text])
         return embeddings[0] if embeddings else []
 
-@st.cache_resource(show_spinner=True)
 def init_faiss():
-    """Initialize FAISS index and load from cache if available."""
+    """Initialize FAISS index and load from file cache if available."""
     index_path = "faiss_index.pkl"
     content_folder = "content"
 
+    # Check if content exists
     if not os.listdir(content_folder):
         st.error("Content folder is empty. Please add documents to 'content/' directory.")
         st.stop()
 
+    # Load from cache if index file exists and content is not modified
     files_modified = max(
         os.path.getmtime(os.path.join(content_folder, f))
         for f in os.listdir(content_folder)
     )
-
     if os.path.exists(index_path) and os.path.getmtime(index_path) >= files_modified:
         with open(index_path, "rb") as f:
             return pickle.load(f)
 
+    # Load and process documents if cache is not available
     loaders = [TextLoader(os.path.join(content_folder, f)) for f in os.listdir(content_folder)]
     splitter = RecursiveCharacterTextSplitter(chunk_size=150, chunk_overlap=30)
     docs = [Document(page_content=doc.page_content) for loader in loaders for doc in loader.load_and_split(splitter)]
 
+    # Create FAISS index
     embeddings_model = CustomEmbeddings()
     faiss_index = FAISS.from_documents(docs, embeddings_model)
 
+    # Save FAISS index to file
     with open(index_path, "wb") as f:
         pickle.dump(faiss_index, f)
 
@@ -133,7 +135,7 @@ def query_custom_model(prompt, context):
             f"{BASE_URL}/chat/completions",
             json={"model": "gpt-4o-prd-gcc2-lb", "messages": messages},
             headers=headers,
-            verify=False  # Use certifi's CA bundle
+            verify=False  # Disable SSL verification for testing
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"].strip()
