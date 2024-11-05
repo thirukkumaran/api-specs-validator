@@ -55,7 +55,7 @@ if not check_password():
     st.stop()  # Do not continue if check_password is not True.
 
 class CustomEmbeddings(Embeddings):
-    """Custom embedding class to fetch embeddings from your model."""
+    """Custom embedding class to fetch embeddings from model."""
     def embed_documents(self, texts):
         """Embed multiple documents."""
         input_json = {"model": "text-embedding-3-small-prd-gcc2-lb", "input": texts}
