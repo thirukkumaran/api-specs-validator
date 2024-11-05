@@ -75,9 +75,7 @@ def validate_api_spec(req:RequestModel) -> ResponseModel:
         if query['human_review']:
             return "This guideline requires human review and cannot be validated by software."
         else:
-            print(f"start {query['standard_id']}")
             result = await chain.ainvoke(query)
-            print(f"end {query['standard_id']}")
             return result
 
     async def process_multiple_queries(queries: list[dict]) -> list[str]:

@@ -1,3 +1,4 @@
+import hmac
 import json
 import openai
 import os
@@ -10,11 +11,38 @@ from validator.api_standards_and_governance import validate_api_spec as validate
 from validator.models import RequestModel, Report, ResponseModel
 from validator.openapi_standard import validate_api_spec as validate_openapi_standard
 
+def check_password():
+    """Returns `True` if the user had the correct password."""
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if hmac.compare_digest(st.session_state["password"], st.secrets["password"]):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Don't store the password.
+        else:
+            st.session_state["password_correct"] = False
+
+    # Return True if the password is validated.
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # Show input for password.
+    st.text_input(
+        "Password", type="password", on_change=password_entered, key="password"
+    )
+    if "password_correct" in st.session_state:
+        st.error("😕 Password incorrect")
+    return False
+
+
+if not check_password():
+    st.stop()  # Do not continue if check_password is not True.
+
 with st.expander('Disclaimer'):
     st.write('''
-IMPORTANT NOTICE: This web application is developed as a proof-of-concept prototype. The information provided here is NOT intended for actual usage and should not be relied upon for making any decisions, especially those related to financial, legal, or healthcare matters.
+**IMPORTANT NOTICE**: This web application is developed as a proof-of-concept prototype. The information provided here is **NOT intended for actual usage** and should not be relied upon for making any decisions, especially those related to financial, legal, or healthcare matters.
 
-Furthermore, please be aware that the LLM may generate inaccurate or incorrect information. You assume full responsibility for how you use any generated output.
+**Furthermore, please be aware that the LLM may generate inaccurate or incorrect information. You assume full responsibility for how you use any generated output.**
 
 Always consult with qualified professionals for accurate and personalized advice.
 ''')
@@ -38,10 +66,6 @@ def interact_with_bot(user_input):
         verify=False  # Disable SSL verification
     )
     return response.choices[0].message['content'].strip()
-
-# Sidebar menu for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["API Spec Validator", "API Guidance Chat"])
 
 def renderReportInMarkdown(report: Report):
     st.markdown(
@@ -94,68 +118,40 @@ class Option:
         self.validator = validator
         self.checked = False
 
-# Display the selected page based on the sidebar menu option
-if page == "API Spec Validator":
-    st.title("API Spec Validator")
+st.title("API Spec Validator")
 
-    options: list[Option] = []
-    options.append(Option("OpenAPI Standard", validate_openapi_standard))
-    options.append(Option("API Standard and Governance", validate_api_standards_and_governance))
+options: list[Option] = []
+options.append(Option("OpenAPI Standard", validate_openapi_standard))
+options.append(Option("API Standard and Governance", validate_api_standards_and_governance))
 
-    # File upload section
-    uploaded_file = st.file_uploader("Upload your API Spec (JSON or YAML)", type=["json", "yaml"])
-    if uploaded_file:
-        # Load the file and perform validation
-        try:
-            if uploaded_file.name.endswith(".json"):
-                req = RequestModel("json", json.load(uploaded_file))
-            else:
-                req = RequestModel("yaml", yaml.safe_load(uploaded_file))
+# File upload section
+uploaded_file = st.file_uploader("Upload your API Spec (JSON or YAML)", type=["json", "yaml"])
+if uploaded_file:
+    # Load the file and perform validation
+    try:
+        if uploaded_file.name.endswith(".json"):
+            req = RequestModel("json", json.load(uploaded_file))
+        else:
+            req = RequestModel("yaml", yaml.safe_load(uploaded_file))
 
-            st.subheader("Generate report for the following:")
+        st.subheader("Generate report for the following:")
 
-            tabNames: list[str] = []
+        tabNames: list[str] = []
+        for i in range(len(options)):
+            options[i].checked = st.checkbox(options[i].name, True)
+            if options[i].checked:
+                tabNames.append(options[i].name)
+
+        if 0 < len(tabNames):
+            t = st.tabs(tabNames)
+            ci = 0
             for i in range(len(options)):
-                options[i].checked = st.checkbox(options[i].name, True)
                 if options[i].checked:
-                    tabNames.append(options[i].name)
+                    with t[ci]:
+                        with st.spinner('Generating report...'):
+                            response = options[ci].validator(req)
+                        renderReportInMarkdown(response.report)
+                    ci += 1
 
-            if 0 < len(tabNames):
-                t = st.tabs(tabNames)
-                ci = 0
-                for i in range(len(options)):
-                    if options[i].checked:
-                        with t[ci]:
-                            with st.spinner('Generating report...'):
-                                response = options[ci].validator(req)
-                            renderReportInMarkdown(response.report)
-                        ci += 1
-
-        except Exception as e:
-            st.error(f"Error processing the file: {str(e)}")
-
-elif page == "API Guidance Chat":
-    st.title("AI Guidance Chat")
-
-    # Initialize Streamlit session state for AIbot chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    # User input text box for AIbot
-    user_input = st.text_input("You: ", key="user_input")
-
-    # Display AIbot messages
-    if user_input:
-        # Get AIbot response
-        ai_response = interact_with_bot(user_input)
-
-        # Store the messages
-        st.session_state.messages.append({"user": user_input, "bot": ai_response})
-
-        # Clear input box after submission
-        st.session_state.user_input = ""
-
-    # Show chat history
-    for msg in st.session_state.messages:
-        st.write(f"You: {msg['user']}")
-        st.write(f"AIbot: {msg['bot']}")
+    except Exception as e:
+        st.error(f"Error processing the file: {str(e)}")
