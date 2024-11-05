@@ -28,7 +28,8 @@ if not API_KEY:
     st.stop()
 
 def check_password():
-    """Returns `True` if the user had the correct password."""
+    """Returns True if the user had the correct password."""
+
     def password_entered():
         """Checks whether a password entered by the user is correct."""
         if hmac.compare_digest(st.session_state["password"], st.secrets["password"]):
@@ -49,88 +50,64 @@ def check_password():
         st.error("😕 Password incorrect")
     return False
 
-# Ensure password protection is active
+
 if not check_password():
     st.stop()  # Do not continue if check_password is not True.
-    
+
 class CustomEmbeddings(Embeddings):
     """Custom embedding class to fetch embeddings from your model."""
-    
     def embed_documents(self, texts):
         """Embed multiple documents."""
-        input_json = {
-            "model": "text-embedding-3-small-prd-gcc2-lb",
-            "input": texts  # Verify that this format is correct according to API documentation
-        }
+        input_json = {"model": "text-embedding-3-small-prd-gcc2-lb", "input": texts}
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {API_KEY}",
             "User-Agent": "Mozilla/5.0"
         }
-        
         try:
             response = requests.post(
                 f"{BASE_URL}/embeddings",
                 json=input_json,
                 headers=headers,
-                verify=False  # Adjust SSL handling as needed
+                verify=False  # Use certifi's CA bundle for SSL verification
             )
-            response.raise_for_status()  # Raises an error for HTTP status codes 400 or above
-
-            # Process and validate response data
-            embedding_data = response.json().get("data", [])
-            if not embedding_data:
-                st.error("No embedding data returned from the server.")
-                return []  # Return an empty list to handle gracefully
-            
-            # Return the embeddings list
-            return [item["embedding"] for item in embedding_data]
-        
+            response.raise_for_status()
+            return [item["embedding"] for item in response.json().get("data", [])]
         except requests.RequestException as e:
             st.error(f"Embedding error: {e}")
-            # Log response text for debugging if available
-            st.write("Response content:", getattr(e.response, "text", "No response content"))
             return []
 
     def embed_query(self, text):
         """Embed a single query."""
         embeddings = self.embed_documents([text])
-        if embeddings:
-            return embeddings[0]  # Safely access the first embedding if available
-        else:
-            st.error("Failed to retrieve embeddings for query.")
-            return None  # Return None if no embeddings are available
+        return embeddings[0] if embeddings else []
 
-
+@st.cache_resource(show_spinner=True)
 def init_faiss():
-    """Initialize FAISS index and load from file cache if available."""
+    """Initialize FAISS index and load from cache if available."""
     index_path = "faiss_index.pkl"
     content_folder = "content"
 
-    # Check if content exists
     if not os.listdir(content_folder):
         st.error("Content folder is empty. Please add documents to 'content/' directory.")
         st.stop()
 
-    # Load from cache if index file exists and content is not modified
     files_modified = max(
         os.path.getmtime(os.path.join(content_folder, f))
         for f in os.listdir(content_folder)
     )
+
     if os.path.exists(index_path) and os.path.getmtime(index_path) >= files_modified:
         with open(index_path, "rb") as f:
             return pickle.load(f)
 
-    # Load and process documents if cache is not available
     loaders = [TextLoader(os.path.join(content_folder, f)) for f in os.listdir(content_folder)]
     splitter = RecursiveCharacterTextSplitter(chunk_size=150, chunk_overlap=30)
     docs = [Document(page_content=doc.page_content) for loader in loaders for doc in loader.load_and_split(splitter)]
 
-    # Create FAISS index
     embeddings_model = CustomEmbeddings()
     faiss_index = FAISS.from_documents(docs, embeddings_model)
 
-    # Save FAISS index to file
     with open(index_path, "wb") as f:
         pickle.dump(faiss_index, f)
 
@@ -156,7 +133,7 @@ def query_custom_model(prompt, context):
             f"{BASE_URL}/chat/completions",
             json={"model": "gpt-4o-prd-gcc2-lb", "messages": messages},
             headers=headers,
-            verify=False  # Disable SSL verification for testing
+            verify=False  # Use certifi's CA bundle
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"].strip()
