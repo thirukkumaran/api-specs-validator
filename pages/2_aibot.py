@@ -15,9 +15,10 @@ import certifi  # Proper SSL handling with certifi
 # Load environment variables from .env file
 load_dotenv()
 
-# Configuration: API Key and Base URL
-API_KEY = os.getenv("API_KEY")
-BASE_URL = "https://litellm.govtext.gov.sg"
+# Configuration: API Key and OpenAI API endpoint
+API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings"
+OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
 # Ensure Python uses certifi's CA bundle for SSL handling
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
@@ -34,42 +35,35 @@ def check_password():
         """Checks whether a password entered by the user is correct."""
         if hmac.compare_digest(st.session_state["password"], st.secrets["password"]):
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Don't store the password.
+            del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
-    # Return True if the password is validated.
     if st.session_state.get("password_correct", False):
         return True
 
-    # Show input for password.
-    st.text_input(
-        "Password", type="password", on_change=password_entered, key="password"
-    )
+    st.text_input("Password", type="password", on_change=password_entered, key="password")
     if "password_correct" in st.session_state:
         st.error("😕 Password incorrect")
     return False
 
-
 if not check_password():
-    st.stop()  # Do not continue if check_password is not True.
+    st.stop()
 
-class CustomEmbeddings(Embeddings):
-    """Custom embedding class to fetch embeddings from model."""
+class CustomOpenAIEmbeddings(Embeddings):
+    """Embedding class to fetch embeddings using direct OpenAI API call with verify=False."""
     def embed_documents(self, texts):
         """Embed multiple documents."""
-        input_json = {"model": "text-embedding-3-small-prd-gcc2-lb", "input": texts}
         headers = {
-            "Content-Type": "application/json",
             "Authorization": f"Bearer {API_KEY}",
-            "User-Agent": "Mozilla/5.0"
+            "Content-Type": "application/json",
         }
         try:
             response = requests.post(
-                f"{BASE_URL}/embeddings",
-                json=input_json,
+                OPENAI_EMBEDDINGS_URL,
+                json={"input": texts, "model": "text-embedding-ada-002"},
                 headers=headers,
-                verify=False  # Use certifi's CA bundle for SSL verification
+                verify=False  # Disable SSL verification
             )
             response.raise_for_status()
             return [item["embedding"] for item in response.json().get("data", [])]
@@ -80,7 +74,7 @@ class CustomEmbeddings(Embeddings):
     def embed_query(self, text):
         """Embed a single query."""
         embeddings = self.embed_documents([text])
-        return embeddings[0] if embeddings else []
+        return embeddings[0] if embeddings else None
 
 @st.cache_resource(show_spinner=True)
 def init_faiss():
@@ -105,7 +99,7 @@ def init_faiss():
     splitter = RecursiveCharacterTextSplitter(chunk_size=150, chunk_overlap=30)
     docs = [Document(page_content=doc.page_content) for loader in loaders for doc in loader.load_and_split(splitter)]
 
-    embeddings_model = CustomEmbeddings()
+    embeddings_model = CustomOpenAIEmbeddings()
     faiss_index = FAISS.from_documents(docs, embeddings_model)
 
     with open(index_path, "wb") as f:
@@ -114,7 +108,7 @@ def init_faiss():
     return faiss_index
 
 def query_custom_model(prompt, context):
-    """Query the custom model with user input and context."""
+    """Query the OpenAI chat model with user input and context."""
     messages = [
         {"role": "system", "content": (
             "You are an expert assistant that answers questions strictly using the provided context. "
@@ -125,15 +119,14 @@ def query_custom_model(prompt, context):
     ]
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {API_KEY}",
-        "User-Agent": "Mozilla/5.0"
+        "Authorization": f"Bearer {API_KEY}"
     }
     try:
         response = requests.post(
-            f"{BASE_URL}/chat/completions",
-            json={"model": "gpt-4o-prd-gcc2-lb", "messages": messages},
+            OPENAI_CHAT_URL,
+            json={"model": "gpt-4-turbo", "messages": messages},
             headers=headers,
-            verify=False  # Use certifi's CA bundle
+            verify=False  # Disable SSL verification
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"].strip()
