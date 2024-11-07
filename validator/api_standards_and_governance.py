@@ -58,9 +58,8 @@ def validate_api_spec(req:RequestModel) -> ResponseModel:
 
     # Define the large language model
     llm = ChatOpenAI(
-        api_key=os.getenv("API_KEY"),
-        openai_api_base="https://litellm.govtext.gov.sg",
-        model="gpt-4o-prd-gcc2-lb",
+        api_key=os.getenv("OPENAI_API_KEY"),
+        model="gpt-4o-mini",
         temperature=0.1,
         default_headers={"user-agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/81.0"},
     )

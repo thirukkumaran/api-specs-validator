@@ -47,7 +47,6 @@ This project provides a Streamlit web application for validating API specs and i
    Create a `.env` file in the root directory of the project and add your OpenAI API key:
    ```
    OPENAI_API_KEY=your-openai-api-key
-   API_KEY=your-api-day
    ```
 
 6. **Running the Application**:
